@@ -1,4 +1,4 @@
-import store from "/js";
+import store from "./js/store.js";
 
 
 
