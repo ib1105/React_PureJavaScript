@@ -109,6 +109,7 @@ class App extends React.Component {
                 {this.state.keywordList.map((item, index) =>{
                     return (
                         <li key={item.id} onClick={() => this.search(item.keyword)}>
+                            {/*key 쓰는 이유 : react는 이 키값을 가지고 어떤 자식 노드가 변경되었는지 찾아낼 수 있다. 이런 용도로 key를 넣었다.  */}
                             <span className="number">{index + 1}</span>
                             <span>{item.keyword}</span>
                         </li>
