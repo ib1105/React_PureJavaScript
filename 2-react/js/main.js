@@ -1,5 +1,16 @@
-import store from "./js/store.js";
+import { formatRelativeDate } from './js/helpers.js';
+import store from './js/store.js';
 
+//const store = require("./js/store.js");
+const TabType = {
+    KEYWORD: 'KEYWORD',
+    HISTORY: 'HISTORY'
+}
+
+const TabLabel = {
+    [TabType.KEYWORD]: '추천 검색어',
+    [TabType.HISTORY]: '최근검색어',
+}
 
 
 class App extends React.Component {
@@ -9,7 +20,20 @@ class App extends React.Component {
         this.state = {
             searchKeyword: "",
             searchResult:[],
+            submitted: false,
+            selectedTab: TabType.KEYWORD,
+            keywordList: [],
+            historyList: [],
         }
+    }
+
+    componentDidMount(){
+        const keywordList = store.getKeywordList();//store.get getKeywordList();
+        const historyList = store.getHistoryList();
+        this.setState({
+            keywordList,
+            historyList,
+        });
     }
 
     handleChangeInput(event){ //react에서 이벤트를 처리해주는 함수는 "handle"로 시작한다.
@@ -17,7 +41,7 @@ class App extends React.Component {
         // this.forceUpdate();
         const searchKeyword = event.target.value;
 
-        if(searchKeyword.length <= 0){
+        if(searchKeyword.length <= 0 && this.state.submitted){
             this.handleReset();
         }
         
@@ -30,25 +54,47 @@ class App extends React.Component {
     }
 
     handleSubmit(event){
+        console.log(this.state.searchKeyword);
         event.preventDefault();
         this.search(this.state.searchKeyword);
     }
 
     search(searchKeyword){
+        console.log("search", searchKeyword);
         const searchResult = store.search(searchKeyword);
-        this.setState({searchResult: ""}); //생성자의 state 객체는 2개다. searchResult 객체는 기존 객체에 Merge된다.
+        const historyList = store.getHistoryList();
+
+        console.log("돌아옴",searchResult);
+        this.setState({
+            searchKeyword,
+            searchResult,
+            historyList,
+            submitted: true
+        
+        }); //생성자의 state 객체는 2개다. searchResult 객체는 기존 객체에 Merge된다.
     }
 
     handleReset(event){
-        this.setState({searchKeyword : ""}); //setState는 비동기로 진행된다. 그래서 밑의 this.state.searchKeyword는 여전히 값이 찍힌다.
+        this.setState({
+            searchKeyword : "",
+            submitted: false,
+    
+        }); //setState는 비동기로 진행된다. 그래서 밑의 this.state.searchKeyword는 여전히 값이 찍힌다.
         console.log('Reset1', this.state.searchKeyword);
 
-        //이 밑의 방식으로 setState()를 호출하면 값이 변경된게 보장이 되면서 아래의 코드를 실행하게 된다.
-        this.setState(() => {
-            return {searchKeyword:""};
-        }, () => {
-            console.log('Reset2', this.state.searchKeyword);
-        });
+        //이 밑의 방식으로 setState()를 호출하면 값이 변경된게 보장이 된다.(동기화가 된다.)
+        // this.setState(() => {
+        //     return {searchKeyword:""};
+        // }, () => {
+        //     console.log('Reset2', this.state.searchKeyword);
+        // });
+    }
+
+    handleClickRemoveHistory(event, keyword){
+        event.stopPropagation(); //event를 넘긴 이유는 event 내의 메서드를 실행 할 수도 있기 때문에 넘겨주었다.
+        store.removeHistory(keyword);
+        const historyList = store.getHistoryList();
+        this.setState({historyList});//컴포넌트는 state가 바뀌었다는 것을 인지하고 render() 함수를 호출한다.
     }
 
     render(){
@@ -57,6 +103,72 @@ class App extends React.Component {
         if(this.state.searchKeyword.length > 0){
             resetButton =  <button type="reset" className="btn-reset"></button>
         }
+
+        const keywordList = (
+            <ul className="list">
+                {this.state.keywordList.map((item, index) =>{
+                    return (
+                        <li key={item.id} onClick={() => this.search(item.keyword)}>
+                            <span className="number">{index + 1}</span>
+                            <span>{item.keyword}</span>
+                        </li>
+                    )    
+                }
+                
+                )}
+            </ul>
+        )
+
+        const historyList = (
+            <ul className="list">
+                {this.state.historyList.map(({id, keyword, date}) => {
+                    return (
+                        <li key={id} onClick={() => this.search(keyword)}>
+                            <span>{keyword}</span>
+                            <span className="date">{formatRelativeDate(date)}</span>
+                            <button className="btn-remove" onClick={event => this.handleClickRemoveHistory(event, keyword)}></button>
+                            {/* 위 버튼 해석 : event가 발생하면 해당event와 클릭한 keyword를 해당 메서드에 넘겨준다. */}
+                        </li>
+                    )
+                }
+                
+                )}
+            </ul>
+        )
+
+        const tabs = (
+            <> 
+            <ul className="tabs">
+                {Object.values(TabType).map(tabType => {
+                    return (
+                        <li className={this.state.selectedTab === tabType ? "active" : ""}
+                             key={tabType}
+                            onClick={()=>this.setState({selectedTab: tabType})}
+                        >
+                            {TabLabel[tabType]}
+                        </li>
+                    )
+                })}
+            </ul>
+            {this.state.selectedTab === TabType.KEYWORD && keywordList}
+            {this.state.selectedTab === TabType.HISTORY && historyList}
+            </>
+        );
+
+        const searchResult = (this.state.searchResult.length > 0 ? (
+            <ul className="result">
+                {this.state.searchResult.map(item =>{
+                    return (
+                        <li key={item.id}>
+                            <img src={item.imageUrl} alt={item.name}/>
+                            <p>{item.name}</p>
+                        </li>
+                    )
+                })}
+            </ul>
+        ) : (
+            <div className="empty-box">검색결과가 없습니다.</div>
+        ))
 
         return (
             <>
@@ -79,21 +191,7 @@ class App extends React.Component {
                     )} 이렇게 조건부 연산자로 {resetButton}을 대체할 수 있다.*/}
                 </form>
                 <div className="content">
-                    {this.state.searchResult.length > 0 ?(
-                        <ul>
-                            {this.state.searchResult.map(item =>{
-                                return (
-                                    <li>
-                                        <img src={item.imageUrl} alt={item.name}/>
-                                        <p>{item.name}</p>
-                                    </li>
-                                )
-                            })}
-
-                        </ul>
-                    ) : (
-                        <div className="empty-box">검색결과가 없습니다.</div>
-                    )}
+                    {this.state.submitted ? searchResult : tabs}
                 </div>
             </div>    
         </>
